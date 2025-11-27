@@ -4,15 +4,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "MyLibrary",
-    platforms: [.iOS(.v17)],
+    name: "AppleSignInLibrary",
+    // Support both iOS and macOS. The SwiftGodot dependency requires macOS 14+,
+    // so the package macOS deployment target is set accordingly.
+    platforms: [.iOS(.v17), .macOS(.v14)],
     
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "MyLibrary",
+            name: "AppleSignInLibrary",
             type: .dynamic,
-            targets: ["MyLibrary"]),
+            targets: ["AppleSignInLibrary"]),
     ],
     dependencies: [
             .package(url: "https://github.com/migueldeicaza/SwiftGodot", branch: "main")
@@ -21,7 +23,7 @@ let package = Package(
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "MyLibrary",
+            name: "AppleSignInLibrary",
             dependencies: [
                             "SwiftGodot",
                         ],

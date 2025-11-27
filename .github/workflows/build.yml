@@ -1,0 +1,45 @@
+name: Build frameworks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    name: Build iOS and macOS frameworks
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up cache for .build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            Packages
+            /Users/runner/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-swift-build-${{ hashFiles('**/Package.resolved') }}
+
+      - name: Display Xcode & Swift environment
+        run: |
+          xcodebuild -version || true
+          swift --version || true
+
+      - name: Make build script executable
+        run: chmod +x ./build.sh
+
+      - name: Build (release)
+        run: ./build.sh release
+
+      - name: List dist directory
+        run: ls -R dist || true
+
+      - name: Upload dist artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist

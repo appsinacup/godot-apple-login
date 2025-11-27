@@ -1,0 +1,11 @@
+[configuration]
+entry_symbol = "swift_entry_point"
+compatibility_minimum = "4.3"
+
+[libraries]
+ios.release = "res://addons/apple_sign_in/ios/AppleSignInLibrary.framework"
+macos.release = "res://addons/apple_sign_in/macos/AppleSignInLibrary.framework"
+
+[dependencies]
+ios.release = {"res://addons/apple_sign_in/ios/SwiftGodot.framework" : ""}
+macos.release = {"res://addons/apple_sign_in/macos/SwiftGodot.framework" : ""}

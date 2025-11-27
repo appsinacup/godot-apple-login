@@ -16,131 +16,38 @@
 
 
 ```
-Bin/
+addons/apple_sign_in/
   ios/
-    MyLibrary.framework/
-      Info.plist
-      MyLibrary
-    SwiftGodot.framework/
-      Info.plist
-      SwiftGodot
-```
+    AppleSignInLibrary.framework/
+      # Apple Sign-In (SwiftGodot)
 
-## 🛠️ Building the Framework ( i already have built it for you Bin/ios/ if you don't see it continue below )
+      Small Swift extension that adds "Sign in with Apple" support for Godot via SwiftGodot.
 
-To build the framework, run the following commands:
+      Quick — build + produce distributable in dist/
 
-```sh
-chmod +x build.sh
-./build.sh ios release
-```
+      ```bash
+      chmod +x ./build.sh
+      ./build.sh release
+      ```
 
-After running the script, you will find the built files inside the `Bin/` directory.
+      What you get (dist/ layout)
+      - dist/addons/apple_sign_in/
+        - AppleSignInLibrary.gdextension
+        - ios/AppleSignInLibrary.framework
+        - macos/AppleSignInLibrary.framework
+      - dist/samples/
+        - sample_login.gd
 
-## 🔗 Setting Up in Godot
+      How to use
+      1. Copy `dist/addons/apple_sign_in` into your Godot project at `res://addons/`
+      2. Open Godot, the `.gdextension` is already pre-configured for iOS and macOS paths
 
-1. **Create a new file named `MyLibrary.gdextension` in the root directory (`res://`).**
-2. Paste the following content into the file:
+      CI
+      - The repository CI builds both platforms and uploads `dist/` as an artifact on push/PR/dispatch
 
-```ini
-[configuration]
-entry_symbol = "swift_entry_point"
-compatibility_minimum = "4.3"
-
-[libraries]
-ios.release = "res://Bin/ios/MyLibrary.framework"
-
-[dependencies]
-ios.release = {"res://Bin/ios/SwiftGodot.framework" : ""}
-```
-
-### 📌 Important:
-- **This file is required to link Godot to iOS.**
-- Copy the framework files into `res://Bin/ios/` before running Godot.
-
-## 🔥 Godot Script Example
-
-Here's a sample **Godot script (`GDScript`)** demonstrating how to use Apple Sign-In:
-
-```gdscript
-extends Control
-
-@onready var apple_button = $Panel/AppleLoginButton
-@onready var error_label = $Panel/MarginContainer/ErrorLabel
-
-# Variable for MyLibrary
-var my_library = null
-
-# Plugin configuration for Apple Sign-In
-const APPLE_PLUGIN_NAME := "MyLibrary"  # Matches your Swift extension name
-
-func _ready() -> void:
-    initialize_plugins()
-    apple_button.pressed.connect(_on_apple_button_pressed)
-
-func initialize_plugins() -> void:
-    if my_library == null && ClassDB.class_exists(APPLE_PLUGIN_NAME):
-        my_library = ClassDB.instantiate(APPLE_PLUGIN_NAME)
-        # Connect to signals defined in MyLibrary.swift
-        my_library.connect("Output", _on_apple_output_signal)
-        my_library.connect("Signout", _on_apple_signout_signal)
-        print("MyLibrary initialized via ClassDB")
-    else:
-        push_error("Apple Sign-In extension not found: %s" % APPLE_PLUGIN_NAME)
-        error_label.show()
-        error_label.text = "Apple Sign-In unavailable"
-
-func _on_apple_button_pressed() -> void:
-    if my_library:
-        if my_library.has_method("signIn"):
-            my_library.signIn()
-    else:
-        error_label.show()
-        push_error("Apple plugin not initialized")
-        error_label.text = "Apple Sign-In error"
-
-func _on_apple_output_signal(output: String) -> void:
-    # Handle the Output signal from MyLibrary
-    error_label.show()
-    error_label.text = output
-
-func _on_apple_signout_signal(signout: String) -> void:
-    # Handle the Signout signal from MyLibrary
-    error_label.show()
-    error_label.text = signout
-```
-
-## 🔄 Rebuilding & Updating the Plugin
-
-If you modify the Swift code, follow these steps to rebuild and update:
-
-```sh
-chmod +x build.sh
-./build.sh ios release
-```
-
-Then, copy the updated files from `Bin/` to your Godot project and repeat the setup process.
-
-## 🌟 Features
-
-- Easy integration with Godot 4.3+
-- Seamless Apple Sign-In implementation
-- Simple signals for handling authentication results
-- Lightweight and optimized for iOS
-
-## 🙌 Acknowledgements
-
-<div align="center">
-  
-  ### Special Thanks To
-  
-  [<img src="https://yt3.ggpht.com/ytc/placeholder" width="60" style="border-radius:50%">](https://www.youtube.com/@codingwithnobody)
-  
-  **[@codingwithnobody](https://www.youtube.com/@codingwithnobody)**
-  
-  *For inspiration and guidance*
-</div>
-
+      Notes
+      - macOS target requires macOS 14+ (matches SwiftGodot)
+      - For macOS/iOS apps, enable "Sign in with Apple" capability and proper entitlements in the host app
 ## 🎮 Try My Games!
 
 <div align="center">
