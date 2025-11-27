@@ -8,3 +8,4 @@ DerivedData/
 .netrc
 dist/addons/apple_sign_in/ios/
 dist/addons/apple_sign_in/macos/
+demo/addons/

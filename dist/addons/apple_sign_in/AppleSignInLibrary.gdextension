@@ -3,9 +3,21 @@ entry_symbol = "swift_entry_point"
 compatibility_minimum = "4.3"
 
 [libraries]
+# iOS
 ios.release = "res://addons/apple_sign_in/ios/AppleSignInLibrary.framework"
-macos.release = "res://addons/apple_sign_in/macos/AppleSignInLibrary.framework"
+
+# macOS: provide arch-specific keys (editor/runtime checks macos.arm64 or macos.x86_64)
+macos.arm64.release = "res://addons/apple_sign_in/macos/AppleSignInLibrary.framework"
+macos.x86_64.release = "res://addons/apple_sign_in/macos/AppleSignInLibrary.framework"
+macos.arm64.debug = "res://addons/apple_sign_in/macos/AppleSignInLibrary.framework"
+macos.x86_64.debug = "res://addons/apple_sign_in/macos/AppleSignInLibrary.framework"
 
 [dependencies]
+# iOS
 ios.release = {"res://addons/apple_sign_in/ios/SwiftGodot.framework" : ""}
-macos.release = {"res://addons/apple_sign_in/macos/SwiftGodot.framework" : ""}
+
+# macOS per-arch dependency entries so Godot loads SwiftGodot before the extension
+macos.arm64.release = {"res://addons/apple_sign_in/macos/SwiftGodot.framework" : ""}
+macos.x86_64.release = {"res://addons/apple_sign_in/macos/SwiftGodot.framework" : ""}
+macos.arm64.debug = {"res://addons/apple_sign_in/macos/SwiftGodot.framework" : ""}
+macos.x86_64.debug = {"res://addons/apple_sign_in/macos/SwiftGodot.framework" : ""}
