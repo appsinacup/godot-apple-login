@@ -44,12 +44,17 @@ jobs:
           name: dist
           path: dist
 
+      - name: Archive
+        shell: sh
+        run: |
+          zip -r "godot_apple_login.zip" dist
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly
           files: |
-            dist/**/*
+            godot_apple_login.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
