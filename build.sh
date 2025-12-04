@@ -94,13 +94,9 @@ build_libs() {
     if [[ ${#COPY_COMMANDS[@]} -gt 0 ]]; then
         echo "${BOLD}${CYAN}Copying frameworks into dist/addons/apple_sign_in...${RESET_FORMATTING}"
         rm -rf "$BINARY_PATH_IOS" "$BINARY_PATH_MACOS"
+        mkdir -p "$BINARY_PATH_IOS" "$BINARY_PATH_MACOS"
         for instruction in ${COPY_COMMANDS[@]}
         do
-            # target is the last token; create parent dir and then run the copy
-            target=${instruction##* }
-            parent=$(dirname "$target")
-            mkdir -p "$parent"
-            mkdir -p "$target"
             eval $instruction
         done
         
