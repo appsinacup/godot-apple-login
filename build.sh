@@ -12,8 +12,11 @@ BINARY_PATH_MACOS="dist/addons/apple_sign_in/macos"
 BUILD_PATH_IOS=".build/arm64-apple-ios"
 BUILD_PATH_MACOS=".build/x86_64-apple-macosx"
 
+
 # MARK: Inputs
 CONFIG=$1
+
+
 if [[ ! $CONFIG ]]; then
     CONFIG="release"
 fi
@@ -129,30 +132,32 @@ build_libs() {
             done
         fi
 
-        # If there is a local demo project, copy dist/addons into demo/addons so the demo stays up-to-date
+        # Copy dist/addons into demo/addons so the demo stays up-to-date
         DEMO_ADDONS="demo/addons"
         if [[ -d "dist/addons" && -d "demo" ]]; then
             echo "Copying dist/addons into demo/addons (overwriting demo/addons/apple_sign_in)..."
             mkdir -p "$DEMO_ADDONS"
-            # remove existing addon folder and copy the freshly built one
             rm -rf "$DEMO_ADDONS/apple_sign_in" || true
             cp -a dist/addons/* "$DEMO_ADDONS/"
-            # After copying to demo, ensure demo binaries are patched too (same install_name_tool fix)
-            if [[ -d "$DEMO_ADDONS/apple_sign_in/macos" ]]; then
-                echo "Patching demo macOS frameworks to use @loader_path -> SwiftGodot"
-                for fw in "$DEMO_ADDONS/apple_sign_in/macos"/*.framework; do
-                    if [[ -d "$fw" ]]; then
-                        bin="$fw/$(basename "$fw" .framework)"
-                        if [[ -f "$bin" ]]; then
-                            install_name_tool -change "@rpath/SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                            install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                            install_name_tool -change "@loader_path/../../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                            # Double-check and correct any remaining shortcuts to SwiftGodot
-                            install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                        fi
+        fi
+
+        # Patch macOS binaries in demo folder
+        if [[ -d "$DEMO_ADDONS/apple_sign_in/macos" ]]; then
+            echo "Patching macOS frameworks in $DEMO_ADDONS to use @loader_path -> SwiftGodot"
+            for fw in "$DEMO_ADDONS/apple_sign_in/macos"/*.framework; do
+                if [[ -d "$fw" ]]; then
+                    bin="$fw/$(basename "$fw" .framework)"
+                    if [[ -f "$bin" ]]; then
+                        install_name_tool -change "@rpath/SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
+                        install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
+                        install_name_tool -change "@loader_path/../../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
                     fi
-                done
-            fi
+                fi
+            done
+        fi
+
+        # Verification for repo demo
+        if [[ -d "$DEMO_ADDONS/apple_sign_in/macos" ]]; then
             echo "Demo addons updated: $DEMO_ADDONS"
 
             # Verification: ensure demo extension binaries reference SwiftGodot via the correct @loader_path
