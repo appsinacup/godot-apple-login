@@ -53,8 +53,11 @@ jobs:
         if: env.MACOS_CERTIFICATE != ''
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
         run: |
+          # Find signing identity from keychain (first code signing certificate)
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep -o '"[^"]*"' | head -1 | tr -d '"')
+          echo "Using signing identity: $SIGNING_IDENTITY"
+          
           # Sign all macOS frameworks
           for fw in dist/addons/apple_sign_in/macos/*.framework; do
             if [[ -d "$fw" ]]; then
