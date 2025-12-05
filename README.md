@@ -2,6 +2,12 @@
 
 A Godot Swift extension that adds Apple Sign In functionality for both iOS and macOS.
 
+<p align = "center">
+    <strong>
+        <a href="https://discord.gg/56dMud8HYn">Discord</a> | <a href="https://appsinacup.com/apple-sign-in/">Guide</a> 
+    </strong>
+</p>
+
 # Install
 
 ## From Godot Assets
@@ -50,17 +56,14 @@ Now you can do in GDScript:
 var apple_sign_in:= AppleSignIn.new()
 
 func _ready() -> void:
-    apple_sign_in.apple_output_signal.connect(_apple_output_signal)
-    apple_sign_in.apple_sign_out_signal.connect(_apple_sign_out_signal)
+	apple_sign_in.apple_output_signal.connect(apple_output_signal)
 	apple_sign_in.sign_in()
 
-func _apple_output_signal(output):
-	if output.begins_with("Error"):
-		push_error(output)
-    else:
-        print("Success, id: ", output)
-    if output.begins
-    print(output)
+func apple_output_signal(id, email, name, error):
+	if error:
+		print("Error: ", error)
+	else:
+		print("Success: ", id, email, name)
 ```
 
 # Build
@@ -72,7 +75,5 @@ Build locally after installing XCode:
 ```
 
 ## Notes
-
-- Enable Sign in with Apple and set entitlements in host app.
 
 - Based on https://github.com/BadalAc/godot-apple-ios-login-plugin with extra gh actions, macos client and high level API.
