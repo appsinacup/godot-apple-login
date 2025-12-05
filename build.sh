@@ -1,29 +1,23 @@
 #!/bin/zsh
 
-# MARK: Help
 echo "iOS & macOS build script"
 echo "Syntax: ./build.sh <config?>"
 echo "Valid configurations: debug & release (Default: release)"
 
-# MARK: Settings
-# Output into the distribution folder
 BINARY_PATH_IOS="dist/addons/apple_sign_in/ios"
 BINARY_PATH_MACOS="dist/addons/apple_sign_in/macos"
 BUILD_PATH_IOS=".build/arm64-apple-ios"
 BUILD_PATH_MACOS=".build/x86_64-apple-macosx"
 
-
-# MARK: Inputs
-CONFIG=$1
-
-
-if [[ ! $CONFIG ]]; then
-    CONFIG="release"
-fi
-
+CONFIG=${1:-release}
 COPY_COMMANDS=()
 
-# MARK: Build iOS
+BOLD="$(tput bold)"
+GREEN="$(tput setaf 2)"
+CYAN="$(tput setaf 6)"
+RED="$(tput setaf 1)"
+RESET="$(tput sgr0)"
+
 build_ios() {
     xcodebuild \
         -scheme "AppleSignInLibrary" \
@@ -36,21 +30,17 @@ build_ios() {
         -quiet
 
     if [[ $? -gt 0 ]]; then
-        echo "${BOLD}${RED}Failed to build iOS library${RESET_FORMATTING}"
+        echo "${BOLD}${RED}Failed to build iOS library${RESET}"
         return 1
     fi
 
-    echo "${BOLD}${GREEN}iOS build succeeded${RESET_FORMATTING}"
+    echo "${BOLD}${GREEN}iOS build succeeded${RESET}"
 
     product_path="$BUILD_PATH_IOS/Build/Products/$1-iphoneos/PackageFrameworks"
-    source_path="Sources"
-    for source in $source_path/*; do
+    for source in Sources/*; do
         COPY_COMMANDS+=("cp -af \"$product_path/$source:t:r.framework\" \"$BINARY_PATH_IOS\"")
     done
-
     COPY_COMMANDS+=("cp -af \"$product_path/SwiftGodot.framework\" \"$BINARY_PATH_IOS\"")
-
-    return 0
 }
 
 build_macos() {
@@ -65,135 +55,84 @@ build_macos() {
         -quiet
 
     if [[ $? -gt 0 ]]; then
-        echo "${BOLD}${RED}Failed to build macOS library${RESET_FORMATTING}"
+        echo "${BOLD}${RED}Failed to build macOS library${RESET}"
         return 1
     fi
 
-    echo "${BOLD}${GREEN}macOS build succeeded${RESET_FORMATTING}"
+    echo "${BOLD}${GREEN}macOS build succeeded${RESET}"
 
-    # Try both possible product locations we might find depending on Xcode/SPM layout
     product_path="$BUILD_PATH_MACOS/Build/Products/$1-macos/PackageFrameworks"
-    if [[ ! -d "$product_path" ]]; then
-        product_path="$BUILD_PATH_MACOS/Build/Products/$1/PackageFrameworks"
-    fi
+    [[ ! -d "$product_path" ]] && product_path="$BUILD_PATH_MACOS/Build/Products/$1/PackageFrameworks"
 
-    source_path="Sources"
-    for source in $source_path/*; do
+    for source in Sources/*; do
         COPY_COMMANDS+=("cp -af \"$product_path/$source:t:r.framework\" \"$BINARY_PATH_MACOS\"")
     done
-
     COPY_COMMANDS+=("cp -af \"$product_path/SwiftGodot.framework\" \"$BINARY_PATH_MACOS\"")
-
-    return 0
 }
 
-# MARK: Pre & Post process
+patch_swiftgodot_path() {
+    local bin="$1"
+    install_name_tool -change "@rpath/SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" 2>/dev/null || true
+    install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" 2>/dev/null || true
+    install_name_tool -change "@loader_path/../../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" 2>/dev/null || true
+}
+
+patch_frameworks() {
+    local dir="$1"
+    [[ ! -d "$dir" ]] && return
+    echo "Patching macOS frameworks in $dir..."
+    for fw in "$dir"/*.framework; do
+        [[ ! -d "$fw" ]] && continue
+        [[ "$(basename "$fw")" = "SwiftGodot.framework" ]] && continue
+        local bin="$fw/$(basename "$fw" .framework)"
+        [[ -f "$bin" ]] && patch_swiftgodot_path "$bin"
+    done
+}
+
+verify_frameworks() {
+    local dir="$1"
+    [[ ! -d "$dir" ]] && return
+    echo "Verifying macOS binaries in $dir..."
+    for fw in "$dir"/*.framework; do
+        [[ ! -d "$fw" ]] && continue
+        [[ "$(basename "$fw")" = "SwiftGodot.framework" ]] && continue
+        local bin="$fw/$(basename "$fw" .framework)"
+        if [[ -f "$bin" ]] && otool -L "$bin" | grep -q "SwiftGodot.framework"; then
+            if ! otool -L "$bin" | grep -q "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot"; then
+                echo "ERROR: $bin has incorrect SwiftGodot path"
+                exit 1
+            fi
+        fi
+    done
+}
+
 build_libs() {
-    echo "${BOLD}${CYAN}Building iOS libraries ($1)...${RESET_FORMATTING}"
+    echo "${BOLD}${CYAN}Building libraries ($1)...${RESET}"
     
     build_ios "$1"
     build_macos "$1"
     
     if [[ ${#COPY_COMMANDS[@]} -gt 0 ]]; then
-        echo "${BOLD}${CYAN}Copying frameworks into dist/addons/apple_sign_in...${RESET_FORMATTING}"
+        echo "${BOLD}${CYAN}Copying frameworks to dist/...${RESET}"
         rm -rf "$BINARY_PATH_IOS" "$BINARY_PATH_MACOS"
         mkdir -p "$BINARY_PATH_IOS" "$BINARY_PATH_MACOS"
-        for instruction in ${COPY_COMMANDS[@]}
-        do
+        for instruction in ${COPY_COMMANDS[@]}; do
             eval $instruction
         done
         
-        # On macOS: ensure the extension looks up SwiftGodot relative to its location
-        # so the runtime loader finds the dependency at res://addons/apple_sign_in/macos/SwiftGodot.framework
-        if [[ -d "$BINARY_PATH_MACOS" ]]; then
-            echo "Patching macOS frameworks to use @loader_path for SwiftGodot..."
-            for fw in "$BINARY_PATH_MACOS"/*.framework; do
-                if [[ -d "$fw" ]]; then
-                    name=$(basename "$fw")
-                    # Skip verifying the SwiftGodot framework itself - it doesn't load itself via @loader_path
-                    if [[ "$name" = "SwiftGodot.framework" ]]; then
-                        continue
-                    fi
-                    bin="$fw/$(basename "$fw" .framework)"
-                    if [[ -f "$bin" ]]; then
-                        echo "Patching $bin"
-                        # The framework binary lives at:
-                        # macos/AppleSignInLibrary.framework/Versions/A/AppleSignInLibrary
-                        # SwiftGodot.framework is located at macos/SwiftGodot.framework -> to reach it
-                        # we need to go two directories up from the binary's loader path.
-                        # try to replace either @rpath or an earlier @loader_path/../ (safe idempotent)
-                        # Point the extension to the SwiftGodot framework at dist/addons/apple_sign_in/macos/
-                        # The binary lives at: macos/AppleSignInLibrary.framework/Versions/A/AppleSignInLibrary
-                        # To reach macos/SwiftGodot.framework we must go up three levels from Versions/A -> ../../.. -> macos
-                        install_name_tool -change "@rpath/SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                        install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                    fi
-                fi
-            done
-        fi
+        patch_frameworks "$BINARY_PATH_MACOS"
 
-        # Copy dist/addons into demo/addons so the demo stays up-to-date
-        DEMO_ADDONS="demo/addons"
         if [[ -d "dist/addons" && -d "demo" ]]; then
-            echo "Copying dist/addons into demo/addons (overwriting demo/addons/apple_sign_in)..."
-            mkdir -p "$DEMO_ADDONS"
-            rm -rf "$DEMO_ADDONS/apple_sign_in" || true
-            cp -a dist/addons/* "$DEMO_ADDONS/"
-        fi
-
-        # Patch macOS binaries in demo folder
-        if [[ -d "$DEMO_ADDONS/apple_sign_in/macos" ]]; then
-            echo "Patching macOS frameworks in $DEMO_ADDONS to use @loader_path -> SwiftGodot"
-            for fw in "$DEMO_ADDONS/apple_sign_in/macos"/*.framework; do
-                if [[ -d "$fw" ]]; then
-                    bin="$fw/$(basename "$fw" .framework)"
-                    if [[ -f "$bin" ]]; then
-                        install_name_tool -change "@rpath/SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                        install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                        install_name_tool -change "@loader_path/../../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
-                    fi
-                fi
-            done
-        fi
-
-        # Verification for repo demo
-        if [[ -d "$DEMO_ADDONS/apple_sign_in/macos" ]]; then
-            echo "Demo addons updated: $DEMO_ADDONS"
-
-            # Verification: ensure demo extension binaries reference SwiftGodot via the correct @loader_path
-            echo "Verifying demo macOS binaries reference SwiftGodot via @loader_path/../../../..."
-            for fw in "$DEMO_ADDONS/apple_sign_in/macos"/*.framework; do
-                if [[ -d "$fw" ]]; then
-                    name=$(basename "$fw")
-                    if [[ "$name" = "SwiftGodot.framework" ]]; then
-                        # Skip verification for the SwiftGodot framework itself
-                        continue
-                    fi
-                    bin="$fw/$(basename "$fw" .framework)"
-                    if [[ -f "$bin" ]]; then
-                        # Only verify binaries that reference SwiftGodot at all (skip SwiftGodot.framework itself)
-                        # Only verify binaries that reference SwiftGodot via a loader path or rpath
-                        if otool -L "$bin" | grep -q "SwiftGodot.framework" && otool -L "$bin" | grep -q "@loader_path\|@rpath"; then
-                            if ! otool -L "$bin" | grep -q "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot"; then
-                                echo "ERROR: $bin still doesn't reference @loader_path/../../../SwiftGodot.framework -> run install_name_tool to fix or re-run build.sh"
-                                exit 1
-                            fi
-                        fi
-                    fi
-                fi
-            done
+            echo "Copying to demo/addons..."
+            mkdir -p "demo/addons"
+            rm -rf "demo/addons/apple_sign_in"
+            cp -a dist/addons/* "demo/addons/"
+            patch_frameworks "demo/addons/apple_sign_in/macos"
+            verify_frameworks "demo/addons/apple_sign_in/macos"
         fi
     fi
 
-    echo "${BOLD}${GREEN}Finished building $1 libraries for iOS and macOS${RESET_FORMATTING}"
+    echo "${BOLD}${GREEN}Finished building $1 libraries${RESET}"
 }
 
-# MARK: Formatting
-BOLD="$(tput bold)"
-GREEN="$(tput setaf 2)"
-CYAN="$(tput setaf 6)"
-RED="$(tput setaf 1)"
-RESET_FORMATTING="$(tput sgr0)"
-
-# MARK: Run
 build_libs "$CONFIG"
