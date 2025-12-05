@@ -106,6 +106,11 @@ build_libs() {
             echo "Patching macOS frameworks to use @loader_path for SwiftGodot..."
             for fw in "$BINARY_PATH_MACOS"/*.framework; do
                 if [[ -d "$fw" ]]; then
+                    name=$(basename "$fw")
+                    # Skip verifying the SwiftGodot framework itself - it doesn't load itself via @loader_path
+                    if [[ "$name" = "SwiftGodot.framework" ]]; then
+                        continue
+                    fi
                     bin="$fw/$(basename "$fw" .framework)"
                     if [[ -f "$bin" ]]; then
                         echo "Patching $bin"
@@ -142,11 +147,36 @@ build_libs() {
                             install_name_tool -change "@rpath/SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
                             install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
                             install_name_tool -change "@loader_path/../../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
+                            # Double-check and correct any remaining shortcuts to SwiftGodot
+                            install_name_tool -change "@loader_path/../SwiftGodot.framework/Versions/A/SwiftGodot" "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot" "$bin" || true
                         fi
                     fi
                 done
             fi
             echo "Demo addons updated: $DEMO_ADDONS"
+
+            # Verification: ensure demo extension binaries reference SwiftGodot via the correct @loader_path
+            echo "Verifying demo macOS binaries reference SwiftGodot via @loader_path/../../../..."
+            for fw in "$DEMO_ADDONS/apple_sign_in/macos"/*.framework; do
+                if [[ -d "$fw" ]]; then
+                    name=$(basename "$fw")
+                    if [[ "$name" = "SwiftGodot.framework" ]]; then
+                        # Skip verification for the SwiftGodot framework itself
+                        continue
+                    fi
+                    bin="$fw/$(basename "$fw" .framework)"
+                    if [[ -f "$bin" ]]; then
+                        # Only verify binaries that reference SwiftGodot at all (skip SwiftGodot.framework itself)
+                        # Only verify binaries that reference SwiftGodot via a loader path or rpath
+                        if otool -L "$bin" | grep -q "SwiftGodot.framework" && otool -L "$bin" | grep -q "@loader_path\|@rpath"; then
+                            if ! otool -L "$bin" | grep -q "@loader_path/../../../SwiftGodot.framework/Versions/A/SwiftGodot"; then
+                                echo "ERROR: $bin still doesn't reference @loader_path/../../../SwiftGodot.framework -> run install_name_tool to fix or re-run build.sh"
+                                exit 1
+                            fi
+                        fi
+                    fi
+                fi
+            done
         fi
     fi
 

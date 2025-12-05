@@ -68,11 +68,7 @@ class AppleSignInLibrary: RefCounted {
     private var signInDelegate: AppleSignInDelegate?
     #endif
     
-    #signal("Output", arguments: ["output": String.self])
-    let signal = SignalWith1Argument<String>("Output")
-    
-    #signal("Signout", arguments: ["signout": String.self])
-    let signalTwo = SignalWith1Argument<String>("Signout")
+    @Signal var Output: SignalWithArguments<String, String, String, String>
     
     let center = NotificationCenter.default
     let name = ASAuthorizationAppleIDProvider.credentialRevokedNotification
@@ -84,13 +80,12 @@ class AppleSignInLibrary: RefCounted {
         
         signInDelegate?.onSuccess = { [weak self] id, email, name in
             guard let self = self else { return }
-            let output = "\(id) \(email ?? "") \(name ?? "")"
-            emit(signal: self.signal, output)
+            Output.emit(id, email ?? "", name ?? "", "")
         }
         
         signInDelegate?.onError = { [weak self] error in
             guard let self = self else { return }
-            emit(signal: self.signal, "Error: \(error)")
+            Output.emit("", "", "", error)
         }
         
         let provider = ASAuthorizationAppleIDProvider()
@@ -102,44 +97,7 @@ class AppleSignInLibrary: RefCounted {
         controller.presentationContextProvider = signInDelegate
         controller.performRequests()
         #else
-        emit(signal: self.signal, "Apple sign in is not supported on this platform")
-        #endif
-    }
-    
-    @Callable
-    func checkForChange() {
-        #if os(iOS) || os(macOS)
-        center.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
-            guard let self = self else { return }
-            emit(signal: self.signalTwo, "Sign out and redirect user to login screen")
-        }
-        #endif
-    }
-    
-    @Callable
-    func checkUserAlreadyLoggedIn() {
-        #if os(iOS) || os(macOS)
-        guard let id = UserDefaults.standard.string(forKey: "id") else {
-            emit(signal: self.signal, "show login screen")
-            return
-        }
-        
-        let provider = ASAuthorizationAppleIDProvider()
-        provider.getCredentialState(forUserID: id) { [weak self] credentialState, error in
-            guard let self = self else { return }
-            switch credentialState {
-            case .authorized:
-                emit(signal: self.signal, "User is already authorized")
-            case .revoked:
-                emit(signal: self.signal, "Sign user out and remove cache and navigate to login screen")
-            case .notFound:
-                emit(signal: self.signal, "show login screen")
-            @unknown default:
-                emit(signal: self.signal, "Unknown credential state")
-            }
-        }
-        #else
-        emit(signal: self.signal, "Apple sign in is not supported on this platform")
+        Output.emit("", "", "", "Apple sign in is not supported on this platform")
         #endif
     }
 }

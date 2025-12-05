@@ -42,6 +42,27 @@ where `entitlements.plist` contains again:
 </array>
 ```
 
+# Test
+
+Now you can do in GDScript:
+
+```py
+var apple_sign_in:= AppleSignIn.new()
+
+func _ready() -> void:
+    apple_sign_in.apple_output_signal.connect(_apple_output_signal)
+    apple_sign_in.apple_sign_out_signal.connect(_apple_sign_out_signal)
+	apple_sign_in.sign_in()
+
+func _apple_output_signal(output):
+	if output.begins_with("Error"):
+		push_error(output)
+    else:
+        print("Success, id: ", output)
+    if output.begins
+    print(output)
+```
+
 # Build
 
 Build locally after installing XCode:
